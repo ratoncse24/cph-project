@@ -13,3 +13,7 @@ docker exec -it fastapi_project_app alembic revision --autogenerate -m "Last nam
 ``
 
 ``docker exec -it fastapi_project_app alembic upgrade head``
+
+### Run tests
+
+``docker exec -it fastapi_project_app pytest tests/ -v``

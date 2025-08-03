@@ -1,5 +1,5 @@
 from typing import Generic, TypeVar, List, Optional, Type
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
@@ -13,13 +13,14 @@ class PaginationParams(BaseModel):
     page: int = Field(default=1, ge=1, description="Page number (starts from 1)")
     size: int = Field(default=20, ge=1, le=100, description="Number of results per page")
 
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "page": 1,
                 "size": 20
             }
         }
+    )
 
 
 class PaginationMeta(BaseModel):

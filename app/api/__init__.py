@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import user, health
+from app.api.v1 import user, health, client
 
 # Create a main API router for version 1
 # All routes included here will be prefixed by whatever prefix is
@@ -11,6 +11,7 @@ api_router_v1 = APIRouter()
 # The prefixes defined here will be relative to the prefix of api_router_v1
 api_router_v1.include_router(user.router, tags=["Users"])
 api_router_v1.include_router(health.router)  # Add health check route
+api_router_v1.include_router(client.router, tags=["Clients"])
 
 # You can add more v1 routers here if needed in the future
 # e.g., from app.api.v1 import orders

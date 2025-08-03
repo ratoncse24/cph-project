@@ -23,8 +23,7 @@ class UserEventData(BaseModel):
     updated_at: str = Field(..., description="Last update timestamp")
     created_by_system: Optional[bool] = Field(None, description="Whether created by system")
     
-    class Config:
-        extra = "allow"  # Allow additional fields that we might not process
+    model_config = ConfigDict(extra="allow")  # Allow additional fields that we might not process
 
 
 class UserUpdatedEventData(UserEventData):

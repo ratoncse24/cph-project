@@ -12,12 +12,17 @@ logger = logging.getLogger(__name__)
 
 async def create_role_option(db: AsyncSession, role_option_data: RoleOptionsCreate) -> RoleOptions:
     """Create a new role option"""
-    role_option_dict = role_option_data.model_dump()
-    role_option = RoleOptions(**role_option_dict)
-    db.add(role_option)
-    await db.commit()
-    await db.refresh(role_option)
-    return role_option
+    try:
+        role_option_dict = role_option_data.model_dump()
+        role_option = RoleOptions(**role_option_dict)
+        db.add(role_option)
+        await db.commit()
+        await db.refresh(role_option)
+        return role_option
+    except Exception as e:
+        logger.error(f"Error creating role option: {e}")
+        await db.rollback()
+        raise
 
 
 async def get_all_role_options(

@@ -1,0 +1,75 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+env/
+
+# Editor files
+.vscode/
+.idea/
+
+# macOS and system files
+.DS_Store
+Thumbs.db
+
+# Python environment
+*.env
+.env.*
+*.sqlite3
+
+# Logs
+*.log
+
+# Alembic
+alembic/versions/*.pyc
+alembic/versions/__pycache__/
+
+# Mypy, Pytest, Coverage
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+.tox/
+.nox/
+
+# Unit test / coverage reports
+coverage.xml
+*.cover
+*.py,cover
+
+# Docker
+*.pid
+*.pid.lock
+docker-compose.override.yml
+docker-compose.dev.yml
+
+# Local postgres/db volumes
+pgdata/
+postgres-data/
+
+# Other tools
+celerybeat-schedule
+instance/
+.scrapy
+
+# Build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# FastAPI Swagger cache
+openapi.json
+
+# logs
+logs/
+logs/*

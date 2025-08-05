@@ -13,6 +13,9 @@ class EventType(str, Enum):
     PROJECT_CREATED = "project_created"
     PROJECT_UPDATED = "project_updated"
     PROJECT_DELETED = "project_deleted"
+    ROLE_CREATED = "role_created"
+    ROLE_UPDATED = "role_updated"
+    ROLE_DELETED = "role_deleted"
 
 
 class ServiceTarget(str, Enum):

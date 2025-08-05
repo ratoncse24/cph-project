@@ -32,7 +32,13 @@ async def create_project_note(db: AsyncSession, note_data: ProjectNotesCreate, u
         note = await project_notes_repo.create_project_note(db, note_data, user_id)
         
         logger.info(f"Project note created successfully by user {user_id}: {note.title}")
-        return note
+        
+        # Get the created note with relations
+        note_with_relations = await project_notes_repo.get_project_note_with_relations(db, note.id)
+        if note_with_relations:
+            return ProjectNotesReadWithRelations.model_validate(note_with_relations)
+        else:
+            return note
         
     except Exception as e:
         logger.error(f"Error in create_project_note service: {e}")
@@ -51,15 +57,13 @@ async def get_project_note(db: AsyncSession, note_id: int) -> Optional[ProjectNo
         Project note with relations or None if not found
     """
     try:
-        note = await project_notes_repo.get_project_note_by_id(db, note_id)
-        if not note:
+        note_with_relations = await project_notes_repo.get_project_note_with_relations(db, note_id)
+        if not note_with_relations:
             logger.warning(f"Project note not found: {note_id}")
             return None
         
         # Convert to response schema with relations
-        # Note: This is a simplified version. In a real implementation,
-        # you might want to fetch related data here
-        return ProjectNotesReadWithRelations.model_validate(note)
+        return ProjectNotesReadWithRelations.model_validate(note_with_relations)
         
     except Exception as e:
         logger.error(f"Error in get_project_note service: {e}")
@@ -127,7 +131,13 @@ async def update_project_note(
             return None
         
         logger.info(f"Project note updated successfully: {updated_note.title} (ID: {note_id})")
-        return ProjectNotesReadWithRelations.model_validate(updated_note)
+        
+        # Get the updated note with relations
+        updated_note_with_relations = await project_notes_repo.get_project_note_with_relations(db, note_id)
+        if updated_note_with_relations:
+            return ProjectNotesReadWithRelations.model_validate(updated_note_with_relations)
+        else:
+            return None
         
     except Exception as e:
         logger.error(f"Error in update_project_note service: {e}")

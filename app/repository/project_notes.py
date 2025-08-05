@@ -48,6 +48,28 @@ async def get_project_note_by_id(db: AsyncSession, note_id: int) -> Optional[Pro
         return None
 
 
+async def get_project_note_with_relations(db: AsyncSession, note_id: int) -> Optional[ProjectNotesReadWithRelations]:
+    """Get project note by ID with related data"""
+    try:
+        result = await db.execute(
+            select(
+                ProjectNotes,
+                Project.name.label('project_name'),
+                User.username.label('added_by_username'),
+                User.name.label('added_by_name'),
+                User.profile_picture_url.label('added_by_profile_picture_url')
+            ).join(
+                Project, ProjectNotes.project_id == Project.id
+            ).join(
+                User, ProjectNotes.added_by_user_id == User.id
+            ).where(ProjectNotes.id == note_id)
+        )
+        return result.first()
+    except Exception as e:
+        logger.error(f"Error fetching project note with relations by ID {note_id}: {e}")
+        return None
+
+
 async def get_project_notes_paginated(
     db: AsyncSession, 
     pagination: PaginationParams,
@@ -68,7 +90,9 @@ async def get_project_notes_paginated(
     query = select(
         ProjectNotes,
         Project.name.label('project_name'),
-        User.username.label('added_by_username')
+        User.username.label('added_by_username'),
+        User.name.label('added_by_name'),
+        User.profile_picture_url.label('added_by_profile_picture_url')
     ).join(
         Project, ProjectNotes.project_id == Project.id
     ).join(

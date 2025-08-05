@@ -5,3 +5,4 @@ from .project import Project  # noqa
 from .project_notes import ProjectNotes  # noqa
 from .role import Role  # noqa
 from .role_notes import RoleNotes  # noqa
+from .project_favorites import ProjectFavorites  # noqa

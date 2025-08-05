@@ -10,8 +10,9 @@ class EventType(str, Enum):
     USER_CREATED = "user_created"
     USER_UPDATED = "user_updated"
     USER_DELETED = "user_deleted"
-    MODEL_CREATED = "model_created"
-    MODEL_UPDATED = "model_updated"
+    PROJECT_CREATED = "project_created"
+    PROJECT_UPDATED = "project_updated"
+    PROJECT_DELETED = "project_deleted"
 
 
 class ServiceTarget(str, Enum):

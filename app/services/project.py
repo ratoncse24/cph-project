@@ -38,7 +38,7 @@ async def create_project_service(db: AsyncSession, project_data: ProjectCreate) 
     
     # Publish project created event
     await _publish_project_event(
-        event_type=EventType.MODEL_CREATED,
+        event_type=EventType.PROJECT_CREATED,
         project_id=new_project.id,
         project_name=new_project.name,
         username=new_project.username,
@@ -129,7 +129,7 @@ async def update_project_service(db: AsyncSession, project_id: int, project_data
     if updated_project:
         # Publish project updated event
         await _publish_project_event(
-            event_type=EventType.MODEL_UPDATED,
+            event_type=EventType.PROJECT_UPDATED,
             project_id=updated_project.id,
             project_name=updated_project.name,
             username=updated_project.username,
@@ -183,6 +183,20 @@ async def delete_project_service(db: AsyncSession, project_id: int) -> bool:
 
 def _convert_to_project_read(project) -> ProjectRead:
     """Convert project model to ProjectRead schema with client information"""
+    # Safely extract client information to avoid lazy loading issues
+    client_name = None
+    client_email = None
+    
+    # Check if client relationship is loaded and accessible
+    if hasattr(project, 'client') and project.client is not None:
+        try:
+            client_name = project.client.name
+            client_email = project.client.email
+        except Exception:
+            # If accessing client attributes fails, set to None
+            client_name = None
+            client_email = None
+    
     project_dict = {
         "id": project.id,
         "name": project.name,
@@ -193,8 +207,8 @@ def _convert_to_project_read(project) -> ProjectRead:
         "created_at": project.created_at,
         "updated_at": project.updated_at,
         "deleted_at": project.deleted_at,
-        "client_name": getattr(project.client, 'name', None) if hasattr(project, 'client') and project.client else None,
-        "client_email": getattr(project.client, 'email', None) if hasattr(project, 'client') and project.client else None
+        "client_name": client_name,
+        "client_email": client_email
     }
     return ProjectRead(**project_dict)
 
@@ -211,7 +225,7 @@ async def _publish_project_event(
     try:
         event_data = {
             "project_id": project_id,
-            "project_name": project_name,
+            "name": project_name,
             "username": username,
             "client_id": client_id
         }
@@ -222,7 +236,7 @@ async def _publish_project_event(
         
         publish_request = PublishEventRequest(
             event_type=event_type,
-            target_services=ServiceTarget.ALL,  # Broadcast to all services
+            target_services=[ServiceTarget.USER_SERVICE, ServiceTarget.SELECTION_SERVICE],  # Broadcast to all services
             data=event_data,
             source_service="project_management"
         )

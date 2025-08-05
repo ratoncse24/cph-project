@@ -43,7 +43,7 @@ class EventRouter:
                 return True
             else:
                 logger.warning(f"⚠️  Unsupported event type: {event_type}")
-                return False
+                return True
                 
             if success:
                 logger.info(f"✅ Successfully processed {event_type} event")

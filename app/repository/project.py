@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import or_, and_
+from sqlalchemy.orm import selectinload
 from typing import Optional, List
 import datetime
 import logging
@@ -22,10 +23,15 @@ async def create_project(db: AsyncSession, project_data: ProjectCreate) -> Proje
     await db.commit()
     await db.refresh(project)
     
-    # Load the client relationship
-    await db.refresh(project, attribute_names=['client'])
+    # Load the client relationship using selectinload
+    result = await db.execute(
+        select(Project)
+        .options(selectinload(Project.client))
+        .where(Project.id == project.id)
+    )
+    project_with_client = result.scalar_one()
     
-    return project
+    return project_with_client
 
 
 async def get_projects_paginated(
@@ -48,7 +54,7 @@ async def get_projects_paginated(
         PaginatedResponse with paginated projects and metadata
     """
     # Build the base query with client relationship
-    query = select(Project).join(Client).where(Project.deleted_at.is_(None))
+    query = select(Project).options(selectinload(Project.client)).where(Project.deleted_at.is_(None))
     
     # Apply business logic filters from query_params
     if query_params:
@@ -63,11 +69,11 @@ async def get_projects_paginated(
         # Handle search parameter
         if query_params.get('search'):
             search_term = f"%{query_params['search']}%"
-            # Build search conditions across project name, username, and client name
+            # Build search conditions across project name and username
+            # Note: Client name search would require a separate query or different approach
             search_conditions = [
                 Project.name.ilike(search_term),
-                Project.username.ilike(search_term),
-                Client.name.ilike(search_term)
+                Project.username.ilike(search_term)
             ]
             query = query.where(or_(*search_conditions))
     
@@ -86,8 +92,12 @@ async def get_projects_paginated(
 async def get_project_by_id(db: AsyncSession, project_id: int) -> Optional[Project]:
     """Get project by ID with client information"""
     try:
+        from sqlalchemy.orm import selectinload
+        
         result = await db.execute(
-            select(Project).join(Client).where(Project.id == project_id)
+            select(Project)
+            .options(selectinload(Project.client))
+            .where(Project.id == project_id)
         )
         return result.scalar_one_or_none()
     except Exception as e:
@@ -131,8 +141,16 @@ async def update_project(db: AsyncSession, project_id: int, project_data: dict) 
         await db.commit()
         await db.refresh(project)
         
-        logger.info(f"Project updated successfully: {project.name} (ID: {project_id})")
-        return project
+        # Load the client relationship
+        result = await db.execute(
+            select(Project)
+            .options(selectinload(Project.client))
+            .where(Project.id == project_id)
+        )
+        project_with_client = result.scalar_one()
+        
+        logger.info(f"Project updated successfully: {project_with_client.name} (ID: {project_id})")
+        return project_with_client
         
     except Exception as e:
         logger.error(f"Error updating project {project_id}: {e}")

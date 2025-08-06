@@ -159,6 +159,7 @@ async def delete_favorite_by_id(
             return JSONResponse(content=response_data.to_dict(), status_code=status.HTTP_404_NOT_FOUND)
         
         response_data = ResponseFormatter.success_response(
+            data={},
             message="Favorite deleted successfully"
         )
         return JSONResponse(content=response_data.to_dict(), status_code=status.HTTP_200_OK)
@@ -171,44 +172,4 @@ async def delete_favorite_by_id(
         return JSONResponse(content=response_data.to_dict(), status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@router.delete("/project-favorites/{favoritable_type}/{favoritable_id}")
-async def delete_favorite(
-    favoritable_type: str,
-    favoritable_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: UserRead = Depends(require_roles([UserRole.ADMIN]))
-):
-    """
-    Delete a favorite (Admin only) - Legacy endpoint
-    
-    Args:
-        favoritable_type: Type of favorited item (Project or Role)
-        favoritable_id: ID of the favorited item
-        db: Database session
-        current_user: Current authenticated admin user
-        
-    Returns:
-        Standardized API response
-    """
-    logger.info(f"Admin {current_user.username} deleting favorite: {favoritable_type} {favoritable_id}")
-    
-    try:
-        success = await project_favorites_service.delete_favorite(db, current_user.id, favoritable_type, favoritable_id)
-        
-        if not success:
-            response_data = ResponseFormatter.error_response(
-                message="Favorite not found"
-            )
-            return JSONResponse(content=response_data.to_dict(), status_code=status.HTTP_404_NOT_FOUND)
-        
-        response_data = ResponseFormatter.success_response(
-            message="Favorite deleted successfully"
-        )
-        return JSONResponse(content=response_data.to_dict(), status_code=status.HTTP_200_OK)
-        
-    except Exception as e:
-        logger.error(f"Error deleting favorite: {e}")
-        response_data = ResponseFormatter.error_response(
-            message="Failed to delete favorite"
-        )
-        return JSONResponse(content=response_data.to_dict(), status_code=status.HTTP_500_INTERNAL_SERVER_ERROR) 
+ 

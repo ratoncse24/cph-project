@@ -2,7 +2,9 @@ from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectRead
+from app.schemas.fact_sheets import FactSheetCreate
 from app.repository import project as project_repository
+from app.repository import fact_sheets as fact_sheets_repository
 from app.utils.pagination import PaginationParams
 from app.events.sns_publisher import sns_publisher
 from app.events.models import PublishEventRequest, EventType, ServiceTarget
@@ -35,6 +37,14 @@ async def create_project_service(db: AsyncSession, project_data: ProjectCreate) 
     
     # Create project in database
     new_project = await project_repository.create_project(db, project_data)
+    
+    # Create fact sheet for the project
+    fact_sheet_data = FactSheetCreate(
+        project_id=new_project.id,
+        client_id=new_project.client_id,
+        status="pending"
+    )
+    await fact_sheets_repository.create_fact_sheet(db, fact_sheet_data)
     
     # Publish project created event
     await _publish_project_event(

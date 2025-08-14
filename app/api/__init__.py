@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import user, health, client, role_options, project, project_notes, role, role_notes, project_favorites
+from app.api.v1 import user, health, client, role_options, project, project_notes, role, role_notes, project_favorites, fact_sheets
 
 # Create a main API router for version 1
 # All routes included here will be prefixed by whatever prefix is
@@ -18,6 +18,7 @@ api_router_v1.include_router(project_notes.router, tags=["Project Notes"])
 api_router_v1.include_router(role.router, tags=["Roles"])
 api_router_v1.include_router(role_notes.router, tags=["Role Notes"])
 api_router_v1.include_router(project_favorites.router, tags=["Project Favorites"])
+api_router_v1.include_router(fact_sheets.router, tags=["Fact Sheets"])
 
 # You can add more v1 routers here if needed in the future
 # e.g., from app.api.v1 import orders

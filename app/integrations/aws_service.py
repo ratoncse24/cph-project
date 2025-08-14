@@ -51,18 +51,21 @@ class AWSService:
 
     # --- S3 Methods ---
     async def upload_file_to_s3(
-        self, file_path: str, object_name: Optional[str] = None
+        self,  file_path: str, bucket_name: Optional[str] = None,object_name: Optional[str] = None
     ) -> Optional[str]:
         """
         Upload a file to an S3 bucket.
 
+        :param bucket_name: S3 bucket name file to upload.
         :param file_path: Path to the file to upload.
         :param object_name: S3 object name. If not specified, file_path's base name is used.
         :return: URL of the uploaded file, or None if upload failed.
         """
         await self._ensure_session()
+
+        upload_bucket_name = bucket_name or self.s3_bucket_name
         
-        if not self.s3_bucket_name:
+        if not upload_bucket_name:
             logger.error("S3 bucket name not configured. Cannot upload file.")
             return None
             
@@ -71,10 +74,10 @@ class AWSService:
             
         try:
             async with self.session.client("s3") as s3_client:
-                await s3_client.upload_file(file_path, self.s3_bucket_name, object_name)
-                file_url = f"https://{self.s3_bucket_name}.s3.{self.region_name}.amazonaws.com/{object_name}"
+                await s3_client.upload_file(file_path, upload_bucket_name, object_name)
+                file_url = f"https://{upload_bucket_name}.s3.{self.region_name}.amazonaws.com/{object_name}"
                 logger.info(
-                    f"File {object_name} uploaded to S3 bucket {self.s3_bucket_name}. URL: {file_url}"
+                    f"File {object_name} uploaded to S3 bucket {upload_bucket_name}. URL: {file_url}"
                 )
                 return file_url
         except FileNotFoundError:
@@ -88,52 +91,6 @@ class AWSService:
             return None
         except Exception as e:
             logger.error(f"An unexpected error occurred during S3 upload: {e}")
-            return None
-
-    async def upload_fileobj_to_s3(
-        self, file_obj: bytes, object_name: str, content_type: Optional[str] = None
-    ) -> Optional[str]:
-        """
-        Upload a file object (bytes) to an S3 bucket.
-
-        :param file_obj: File content as bytes.
-        :param object_name: S3 object name/key.
-        :param content_type: MIME type of the file.
-        :return: S3 object key if successful, or None if upload failed.
-        """
-        await self._ensure_session()
-        
-        if not self.s3_bucket_name:
-            logger.error("S3 bucket name not configured. Cannot upload file.")
-            return None
-            
-        try:
-            from io import BytesIO
-            file_stream = BytesIO(file_obj)
-            
-            extra_args = {}
-            if content_type:
-                extra_args['ContentType'] = content_type
-            
-            async with self.session.client("s3") as s3_client:
-                await s3_client.upload_fileobj(
-                    file_stream, 
-                    self.s3_bucket_name, 
-                    object_name,
-                    ExtraArgs=extra_args
-                )
-                logger.info(
-                    f"File object uploaded to S3 bucket {self.s3_bucket_name} as {object_name}"
-                )
-                return object_name  # Return the object key, not the full URL
-        except NoCredentialsError:
-            logger.error("Credentials not available for S3 upload.")
-            return None
-        except ClientError as e:
-            logger.error(f"S3 ClientError during file object upload: {e}")
-            return None
-        except Exception as e:
-            logger.error(f"An unexpected error occurred during S3 file object upload: {e}")
             return None
 
     async def get_s3_file_url(
@@ -168,6 +125,56 @@ class AWSService:
             return None
         except Exception as e:
             logger.error(f"An unexpected error occurred generating presigned URL: {e}")
+            return None
+
+    async def copy_s3_object(
+        self, 
+        source_object_key: str, 
+        destination_object_key: str
+    ) -> Optional[str]:
+        """
+        Copy an S3 object to a new location.
+
+        :param source_object_key: Source S3 object key.
+        :param destination_object_key: Destination S3 object key.
+        :param source_bucket: Source bucket name (optional, uses default bucket if not provided).
+        :return: URL of the copied object, or None if copy failed.
+        """
+        await self._ensure_session()
+        
+        if not self.s3_bucket_name:
+            logger.error("S3 bucket name not configured. Cannot copy object.")
+            return None
+        
+        # Use source bucket if provided, otherwise use default bucket
+        source_bucket_name = self.s3_bucket_name
+        destination_bucket = settings.AWS_S3_PROFILE_PICTURES_BUCKET_NAME
+            
+        try:
+            async with self.session.client("s3") as s3_client:
+                # Copy object
+                copy_source = {
+                    'Bucket': source_bucket_name,
+                    'Key': source_object_key
+                }
+                
+                await s3_client.copy_object(
+                    CopySource=copy_source,
+                    Bucket=destination_bucket,
+                    Key=destination_object_key
+                )
+                
+                # Generate URL for the copied object
+                file_url = f"https://{destination_bucket}.s3.{self.region_name}.amazonaws.com/{destination_object_key}"
+                logger.info(
+                    f"Object {source_object_key} copied to {destination_object_key} in bucket {destination_bucket}. URL: {file_url}"
+                )
+                return file_url
+        except ClientError as e:
+            logger.error(f"S3 ClientError during copy: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"An unexpected error occurred during S3 copy: {e}")
             return None
 
     # --- SQS Methods ---
@@ -276,55 +283,21 @@ class AWSService:
             logger.error(f"An unexpected error occurred deleting SQS message: {e}")
             return False
 
-    async def delete_s3_object(self, object_name: str) -> bool:
-        """
-        Delete an object from S3 bucket.
-
-        :param object_name: S3 object name/key to delete.
-        :return: True if successful, False otherwise.
-        """
-        await self._ensure_session()
-        
-        if not self.s3_bucket_name:
-            logger.error("S3 bucket name not configured. Cannot delete object.")
-            return False
-            
-        try:
-            async with self.session.client("s3") as s3_client:
-                await s3_client.delete_object(
-                    Bucket=self.s3_bucket_name,
-                    Key=object_name
-                )
-                logger.info(
-                    f"Object {object_name} deleted from S3 bucket {self.s3_bucket_name}"
-                )
-                return True
-        except ClientError as e:
-            logger.error(f"S3 ClientError deleting object {object_name}: {e}")
-            return False
-        except Exception as e:
-            logger.error(f"An unexpected error occurred deleting S3 object {object_name}: {e}")
-            return False
-
     # --- SNS Methods ---
     async def publish_sns_message(
         self,
         topic_arn: str,
         message: str,
         subject: Optional[str] = None,
-        message_attributes: Optional[Dict[str, Any]] = None,
-        message_group_id: Optional[str] = None,
-        message_deduplication_id: Optional[str] = None,
+        message_attributes: Optional[Dict[str, Any]] = None
     ) -> Optional[str]:
         """
-        Publish a message to a specific SNS topic (supports both standard and FIFO topics).
+        Publish a message to a specific SNS topic (standard topics only).
 
         :param topic_arn: The ARN of the SNS topic to publish to.
         :param message: The message body string.
         :param subject: Optional subject for the message (used for email notifications).
         :param message_attributes: Optional dictionary of message attributes.
-        :param message_group_id: Required for FIFO topics - groups related messages.
-        :param message_deduplication_id: Optional for FIFO topics - prevents duplicate messages.
         :return: Message ID if successful, else None.
         """
         await self._ensure_session()
@@ -344,26 +317,11 @@ class AWSService:
                 if message_attributes:
                     params["MessageAttributes"] = message_attributes
 
-                # Check if this is a FIFO topic
-                is_fifo_topic = topic_arn.endswith('.fifo')
-                
-                if is_fifo_topic:
-                    # FIFO topics require MessageGroupId
-                    if not message_group_id:
-                        # Use a default group ID if none provided
-                        message_group_id = "default-group"
-                    params["MessageGroupId"] = message_group_id
-                    
-                    # MessageDeduplicationId is optional but recommended for FIFO
-                    if message_deduplication_id:
-                        params["MessageDeduplicationId"] = message_deduplication_id
-
                 response = await sns_client.publish(**params)
                 message_id = response.get("MessageId")
                 
-                fifo_info = f" (FIFO: group={message_group_id})" if is_fifo_topic else ""
                 logger.info(
-                    f"Message published to SNS topic {topic_arn}{fifo_info}. Message ID: {message_id}"
+                    f"Message published to SNS topic {topic_arn}. Message ID: {message_id}"
                 )
                 return message_id
         except ClientError as e:

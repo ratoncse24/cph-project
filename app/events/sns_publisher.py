@@ -53,15 +53,12 @@ class SNSPublisherService:
                 }
             }
             
-            # Publish to SNS
-            # For FIFO topics, use event_type as MessageGroupId and event_id as MessageDeduplicationId
+            # Publish to SNS (Standard queue - no FIFO parameters needed)
             message_id = await self.aws_service.publish_sns_message(
                 topic_arn=self.topic_arn,
                 message=message_body,
                 subject=f"Event: {event_message.event_type}",
-                message_attributes=message_attributes,
-                message_group_id=event_message.event_type,  # Group by event type
-                message_deduplication_id=event_message.event_id  # Use event ID for deduplication
+                message_attributes=message_attributes
             )
             
             if message_id:

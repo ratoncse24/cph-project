@@ -18,12 +18,14 @@ class UserEventData(BaseModel):
     temporary_profile_picture_url: Optional[str] = Field(None, description="Temporary profile picture URL")
     temporary_profile_picture_expires_at: Optional[datetime] = None
     status: str = Field(..., description="User status")
+    token_version: Optional[int] = Field(None, description="Token version for JWT invalidation")
     member_of: Optional[str] = Field(None, description="Organization/group membership (ignored by our service)")
     created_at: str = Field(..., description="Creation timestamp")
     updated_at: str = Field(..., description="Last update timestamp")
     created_by_system: Optional[bool] = Field(None, description="Whether created by system")
     
-    model_config = ConfigDict(extra="allow")  # Allow additional fields that we might not process
+    class Config:
+        extra = "allow"  # Allow additional fields that we might not process
 
 
 class UserUpdatedEventData(UserEventData):
@@ -76,6 +78,7 @@ class UserRead(BaseModel):
     temporary_profile_picture_url: Optional[str] = None
     temporary_profile_picture_expires_at: Optional[datetime] = None
     status: str
+    token_version: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
@@ -123,6 +126,7 @@ class UserUpdate(BaseModel):
     role_name: Optional[str] = Field(None, max_length=20)
     profile_picture_url: Optional[str] = None
     status: Optional[str] = Field(None, max_length=20)
+    token_version: Optional[int] = Field(None, description="Token version for JWT invalidation")
 
     @field_validator("username")
     @classmethod

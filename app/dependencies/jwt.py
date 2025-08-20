@@ -192,12 +192,13 @@ def create_token_pair(data: dict) -> Dict[str, str]:
     }
 
 
-def refresh_access_token(refresh_token: str) -> Dict[str, str]:
+async def refresh_access_token(refresh_token: str, db=None) -> Dict[str, str]:
     """
     Create new access token from refresh token
     
     Args:
         refresh_token: Valid refresh token
+        db: Database session for token version validation
         
     Returns:
         New token pair
@@ -211,12 +212,26 @@ def refresh_access_token(refresh_token: str) -> Dict[str, str]:
         # Ensure payload is valid
         if payload is None:
             raise InvalidTokenError("Invalid refresh token payload")
+        
+        # Validate token version if database is provided
+        if db is not None:
+            from app.repository.user import get_user_by_username
+            username = payload.get("sub")
+            if username:
+                user = await get_user_by_username(db, username)
+                if user:
+                    token_version = payload.get("token_version")
+                    user_token_version = getattr(user, 'token_version', 0)
+                    
+                    if token_version is not None and token_version != user_token_version:
+                        raise InvalidTokenError("Token has been invalidated due to password change")
             
         # Create new token pair with same user data (preserve additional claims)
         user_data = {
             "sub": payload["sub"],  # This will be the username
             "user_id": payload.get("user_id"),
-            "username": payload.get("username")
+            "username": payload.get("username"),
+            "token_version": payload.get("token_version")  # Include token version
         }
         # Add email if it exists in the original token
         if payload.get("email"):

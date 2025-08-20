@@ -81,6 +81,17 @@ async def get_current_user(
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
+        # Validate token version
+        token_version = payload.get("token_version")
+        user_token_version = getattr(user, 'token_version', 0)
+        
+        if token_version is not None and token_version != user_token_version:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been invalidated due to password change",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
         return user
         
     except ExpiredTokenError:
@@ -96,7 +107,6 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     except Exception as e:
-        print(e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication failed",

@@ -207,7 +207,9 @@ class SQSConsumerService:
                                 else:
                                     logger.error(f"❌ Failed to process event {event_msg.event_id}")
                             else:
-                                logger.warning(f"⚠️  Failed to parse message: {sqs_msg.MessageId}")
+                                logger.warning(f"⚠️  Failed to parse message: {sqs_msg.MessageId} - removing from queue")
+                                # Delete malformed messages to prevent queue clogging
+                                await self.delete_message(queue_url, sqs_msg.ReceiptHandle)
                                 
                         except Exception as e:
                             logger.error(f"❌ Error processing message {sqs_msg.MessageId}: {e}")

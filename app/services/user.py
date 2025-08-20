@@ -41,7 +41,7 @@ def map_event_data_to_user_fields(event_data: UserEventData) -> Dict[str, Any]:
     allowed_fields = {
         'name', 'username', 'email', 'phone', 'role_name', 'profile_picture_url',
         'temporary_profile_picture_url', 'temporary_profile_picture_expires_at',
-        'status', 'created_at', 'updated_at'
+        'status', 'token_version', 'created_at', 'updated_at'
     }
     
     # Convert to dict and filter

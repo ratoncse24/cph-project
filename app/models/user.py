@@ -17,6 +17,7 @@ class User(Base):
     temporary_profile_picture_url = Column(Text, nullable=True)
     temporary_profile_picture_expires_at = Column(TIMESTAMP(timezone=True), nullable=True)
     status = Column(String(20), nullable=False, default="active")
+    token_version = Column(Integer, nullable=True, default=0)
     created_at = Column(TIMESTAMP(timezone=True), default=datetime.datetime.utcnow)
     updated_at = Column(TIMESTAMP(timezone=True), default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     deleted_at = Column(TIMESTAMP(timezone=True), nullable=True)

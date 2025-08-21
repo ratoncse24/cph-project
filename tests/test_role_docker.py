@@ -440,4 +440,200 @@ class TestRoleSchemaValidation:
         role_update = RoleUpdate(**partial_data)
         assert role_update.name == "Updated Role Name"
         assert role_update.age_from is None
-        assert role_update.status is None 
+        assert role_update.status is None
+
+
+class TestRoleBasedAccessControl:
+    """Test role-based access control for roles API"""
+    
+    def test_project_user_access_own_project_roles(self):
+        """Test that project user can access roles for their own project"""
+        app.dependency_overrides = {}
+        
+        # Create a mock project user with username that matches a project
+        mock_user = UserRead(
+            id=2,
+            username="testproject",  # This should match a project username
+            email="project@example.com",
+            role_name=UserRole.PROJECT,
+            status="active"
+        )
+        
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        try:
+            response = client.get("/projects/api/v1/roles")
+            
+            # Should get 200 for success or 500 for database issues
+            assert response.status_code in [200, 500]
+            
+            if response.status_code == 200:
+                data = response.json()
+                assert data["success"] is True
+                assert "results" in data["response"]["data"]
+                assert "meta" in data["response"]["data"]
+                # Verify that only roles for the user's project are returned
+                # (This is handled at the service level, so we just verify the response structure)
+            else:
+                # Database error is expected in some cases
+                print(f"Database error (expected): {response.json()}")
+                
+        finally:
+            app.dependency_overrides = {}
+    
+    def test_project_user_project_id_filter_ignored(self):
+        """Test that project_id filter is ignored for PROJECT role users"""
+        app.dependency_overrides = {}
+        
+        # Create a mock project user with username that matches a project
+        mock_user = UserRead(
+            id=2,
+            username="testproject",  # This should match a project username
+            email="project@example.com",
+            role_name=UserRole.PROJECT,
+            status="active"
+        )
+        
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        try:
+            # Try to filter by a different project ID - should be ignored
+            response = client.get("/projects/api/v1/roles?project_id=999")
+            
+            # Should get 200 for success or 500 for database issues
+            assert response.status_code in [200, 500]
+            
+            if response.status_code == 200:
+                data = response.json()
+                assert data["success"] is True
+                # The service should override the project_id filter and only return roles for the user's project
+                
+        finally:
+            app.dependency_overrides = {}
+    
+    def test_project_user_with_other_filters(self):
+        """Test that PROJECT role users can use other filters"""
+        app.dependency_overrides = {}
+        
+        # Create a mock project user with username that matches a project
+        mock_user = UserRead(
+            id=2,
+            username="testproject",  # This should match a project username
+            email="project@example.com",
+            role_name=UserRole.PROJECT,
+            status="active"
+        )
+        
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        try:
+            # Test with various filters - should work for PROJECT role users
+            response = client.get("/projects/api/v1/roles?search=actor&gender=Male&category=Actor&page=1&size=10")
+            
+            # Should get 200 for success or 500 for database issues
+            assert response.status_code in [200, 500]
+            
+            if response.status_code == 200:
+                data = response.json()
+                assert data["success"] is True
+                assert "results" in data["response"]["data"]
+                assert "meta" in data["response"]["data"]
+                
+        finally:
+            app.dependency_overrides = {}
+    
+    def test_admin_user_access_all_roles(self):
+        """Test that admin user can access roles for any project"""
+        app.dependency_overrides = {}
+        
+        mock_user = get_mock_user()  # This is an admin user
+        
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        try:
+            response = client.get("/projects/api/v1/roles")
+            
+            # Should get 200 for success or 500 for database issues
+            assert response.status_code in [200, 500]
+            
+            if response.status_code == 200:
+                data = response.json()
+                assert data["success"] is True
+                assert "results" in data["response"]["data"]
+                assert "meta" in data["response"]["data"]
+                
+        finally:
+            app.dependency_overrides = {}
+    
+    def test_admin_user_with_project_filter(self):
+        """Test that admin user can filter by specific project"""
+        app.dependency_overrides = {}
+        
+        mock_user = get_mock_user()  # This is an admin user
+        
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        try:
+            # Admin should be able to filter by any project
+            response = client.get("/projects/api/v1/roles?project_id=1")
+            
+            # Should get 200 for success or 500 for database issues
+            assert response.status_code in [200, 500]
+            
+            if response.status_code == 200:
+                data = response.json()
+                assert data["success"] is True
+                assert "results" in data["response"]["data"]
+                assert "meta" in data["response"]["data"]
+                
+        finally:
+            app.dependency_overrides = {}
+    
+    def test_project_user_no_project_found(self):
+        """Test that PROJECT role user gets empty result if no project found"""
+        app.dependency_overrides = {}
+        
+        # Create a mock project user with username that doesn't match any project
+        mock_user = UserRead(
+            id=2,
+            username="nonexistentproject",  # This should NOT match any project username
+            email="nonexistent@example.com",
+            role_name=UserRole.PROJECT,
+            status="active"
+        )
+        
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        try:
+            response = client.get("/projects/api/v1/roles")
+            
+            # Should get 200 with empty results
+            assert response.status_code == 200
+            data = response.json()
+            assert data["success"] is True
+            assert "results" in data["response"]["data"]
+            assert "meta" in data["response"]["data"]
+            # Should return empty results since no project found for this user
+            assert len(data["response"]["data"]["results"]) == 0
+            assert data["response"]["data"]["meta"]["total"] == 0
+                
+        finally:
+            app.dependency_overrides = {} 

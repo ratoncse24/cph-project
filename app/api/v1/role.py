@@ -73,16 +73,19 @@ async def get_roles_list(
     height_from: float = Query(default=None, ge=0, le=300, description="Filter by minimum height (cm)"),
     height_to: float = Query(default=None, ge=0, le=300, description="Filter by maximum height (cm)"),
     db: AsyncSession = Depends(get_db),
-    current_user: UserRead = Depends(require_roles([UserRole.ADMIN]))
+    current_user: UserRead = Depends(require_roles([UserRole.ADMIN, UserRole.PROJECT]))
 ):
     """
-    Get paginated list of roles with filtering and search (Admin only)
+    Get paginated list of roles with filtering and search
+    
+    PROJECT role users can only see roles for their own project.
+    ADMIN role users can see roles for any project.
     
     Args:
         page: Page number (starts from 1)
         size: Number of results per page (max 100)
         search: Optional search term for filtering roles
-        project_id: Optional project ID filter
+        project_id: Optional project ID filter (ignored for PROJECT role users)
         status: Optional status filter
         gender: Optional gender filter
         category: Optional category filter
@@ -91,12 +94,12 @@ async def get_roles_list(
         height_from: Optional minimum height filter (cm)
         height_to: Optional maximum height filter (cm)
         db: Database session
-        current_user: Current authenticated admin user
+        current_user: Current authenticated user
         
     Returns:
         Standardized API response with paginated list of roles
     """
-    logger.info(f"Admin {current_user.username} requesting roles list - page: {page}, size: {size}")
+    logger.info(f"User {current_user.username} requesting roles list - page: {page}, size: {size}")
     
     # Separate pagination parameters from query filters
     pagination = PaginationParams(page=page, size=size)
@@ -123,8 +126,14 @@ async def get_roles_list(
         query_params['height_to'] = height_to
     
     try:
-        # Service handles business logic and delegates to repository
-        result = await role_service.get_roles_list(db, pagination, query_params)
+        # Service handles business logic and delegates to repository with role-based access control
+        result = await role_service.get_roles_list(
+            db, 
+            pagination, 
+            query_params,
+            current_user.role_name,
+            current_user.username
+        )
         
         logger.info(f"Returned {len(result.results)} roles out of {result.meta.total} total")
         response_data = ResponseFormatter.success_response(data=result)

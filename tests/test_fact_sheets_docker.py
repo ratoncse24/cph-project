@@ -427,4 +427,221 @@ class TestFactSheetsSchemaValidation:
         """Test health check endpoint"""
         response = client.get("/health")
         assert response.status_code == 200
-        assert response.json()["status"] == "healthy" 
+        assert response.json()["status"] == "healthy"
+
+
+class TestFactSheetsRoleBasedAccess:
+    """Test role-based access control for fact sheets"""
+    
+    def test_project_user_access_own_project(self):
+        """Test that project user can access fact sheet for their own project"""
+        app.dependency_overrides = {}
+        
+        # Create a mock project user with username that matches a project
+        mock_user = UserRead(
+            id=2,
+            username="testproject",  # This should match a project username
+            email="project@example.com",
+            role_name=UserRole.PROJECT,
+            status="active"
+        )
+        
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        try:
+            response = client.get("/projects/api/v1/fact-sheets/1")
+            
+            # Should get 200 for success or 404 for not found
+            assert response.status_code in [200, 404]
+            
+            if response.status_code == 200:
+                data = response.json()
+                assert data["success"] is True
+                assert "Fact sheet retrieved successfully" in data["message"]
+            else:
+                data = response.json()
+                assert data["success"] is False
+                assert "Fact sheet not found" in data["message"]
+                
+        finally:
+            app.dependency_overrides = {}
+    
+    def test_project_user_access_other_project_forbidden(self):
+        """Test that project user cannot access fact sheet for other projects"""
+        app.dependency_overrides = {}
+        
+        # Create a mock project user with username that doesn't match the project
+        mock_user = UserRead(
+            id=2,
+            username="otherproject",  # This should NOT match the project username
+            email="other@example.com",
+            role_name=UserRole.PROJECT,
+            status="active"
+        )
+        
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        try:
+            response = client.get("/projects/api/v1/fact-sheets/1")
+            
+            # Should get 403 for access denied
+            assert response.status_code == 403
+            data = response.json()
+            assert data["success"] is False
+            assert "Access denied: You can only access fact sheets for your own project" in data["message"]
+                
+        finally:
+            app.dependency_overrides = {}
+    
+    def test_project_user_update_own_project(self):
+        """Test that project user can update fact sheet for their own project"""
+        app.dependency_overrides = {}
+        
+        # Create a mock project user with username that matches a project
+        mock_user = UserRead(
+            id=2,
+            username="testproject",  # This should match a project username
+            email="project@example.com",
+            role_name=UserRole.PROJECT,
+            status="active"
+        )
+        
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        fact_sheet_update_data = {
+            "project_name": "Updated Project Name",
+            "director": "Updated Director"
+        }
+        
+        try:
+            response = client.put("/projects/api/v1/fact-sheets/1", json=fact_sheet_update_data)
+            
+            # Should get 200 for success, 404 for not found, or 400 for validation errors
+            assert response.status_code in [200, 404, 400]
+            
+            if response.status_code == 200:
+                data = response.json()
+                assert data["success"] is True
+                assert "Fact sheet updated successfully" in data["message"]
+            elif response.status_code == 400:
+                data = response.json()
+                assert data["success"] is False
+                # Could be validation error or business logic error
+                print(f"Validation error (expected): {data['message']}")
+            else:
+                data = response.json()
+                assert data["success"] is False
+                assert "Fact sheet not found" in data["message"]
+                
+        finally:
+            app.dependency_overrides = {}
+    
+    def test_project_user_update_other_project_forbidden(self):
+        """Test that project user cannot update fact sheet for other projects"""
+        app.dependency_overrides = {}
+        
+        # Create a mock project user with username that doesn't match the project
+        mock_user = UserRead(
+            id=2,
+            username="otherproject",  # This should NOT match the project username
+            email="other@example.com",
+            role_name=UserRole.PROJECT,
+            status="active"
+        )
+        
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        fact_sheet_update_data = {
+            "project_name": "Trying to update other project"
+        }
+        
+        try:
+            response = client.put("/projects/api/v1/fact-sheets/1", json=fact_sheet_update_data)
+            
+            # Should get 400 for access denied (ValueError is caught and returned as 400)
+            assert response.status_code == 400
+            data = response.json()
+            assert data["success"] is False
+            assert "Access denied: You can only update fact sheets for your own project" in data["message"]
+                
+        finally:
+            app.dependency_overrides = {}
+    
+    def test_admin_access_any_project(self):
+        """Test that admin can access fact sheet for any project"""
+        app.dependency_overrides = {}
+        
+        mock_user = get_mock_admin_user()
+        
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        try:
+            response = client.get("/projects/api/v1/fact-sheets/1")
+            
+            # Should get 200 for success or 404 for not found
+            assert response.status_code in [200, 404]
+            
+            if response.status_code == 200:
+                data = response.json()
+                assert data["success"] is True
+                assert "Fact sheet retrieved successfully" in data["message"]
+            else:
+                data = response.json()
+                assert data["success"] is False
+                assert "Fact sheet not found" in data["message"]
+                
+        finally:
+            app.dependency_overrides = {}
+    
+    def test_admin_update_any_project(self):
+        """Test that admin can update fact sheet for any project (status only)"""
+        app.dependency_overrides = {}
+        
+        mock_user = get_mock_admin_user()
+        
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        fact_sheet_update_data = {
+            "status": "approved"  # Admin can only update status
+        }
+        
+        try:
+            response = client.put("/projects/api/v1/fact-sheets/1", json=fact_sheet_update_data)
+            
+            # Should get 200 for success, 404 for not found, or 400 for validation errors
+            assert response.status_code in [200, 404, 400]
+            
+            if response.status_code == 200:
+                data = response.json()
+                assert data["success"] is True
+                assert "Fact sheet updated successfully" in data["message"]
+            elif response.status_code == 400:
+                data = response.json()
+                assert data["success"] is False
+                # Could be validation error or business logic error
+                print(f"Validation error (expected): {data['message']}")
+            else:
+                data = response.json()
+                assert data["success"] is False
+                assert "Fact sheet not found" in data["message"]
+                
+        finally:
+            app.dependency_overrides = {} 

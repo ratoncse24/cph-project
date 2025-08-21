@@ -198,4 +198,31 @@ async def check_project_exists(db: AsyncSession, project_id: int) -> bool:
         return result.scalar_one_or_none() is not None
     except Exception as e:
         logger.error(f"Error checking project existence {project_id}: {e}")
-        return False 
+        return False
+
+
+async def check_user_project_access(db: AsyncSession, username: str, project_id: int) -> bool:
+    """Check if user has access to the project (for PROJECT role users)"""
+    try:
+        result = await db.execute(
+            select(Project).where(
+                Project.id == project_id,
+                Project.username == username
+            )
+        )
+        return result.scalar_one_or_none() is not None
+    except Exception as e:
+        logger.error(f"Error checking user project access for user {username} and project {project_id}: {e}")
+        return False
+
+
+async def get_user_project_id(db: AsyncSession, username: str) -> Optional[int]:
+    """Get project ID for a given username (for PROJECT role users)"""
+    try:
+        result = await db.execute(
+            select(Project.id).where(Project.username == username)
+        )
+        return result.scalar_one_or_none()
+    except Exception as e:
+        logger.error(f"Error getting project ID for user {username}: {e}")
+        return None 

@@ -42,17 +42,33 @@ async def create_fact_sheet_service(db: AsyncSession, fact_sheet_data: FactSheet
     return _convert_to_fact_sheet_read(new_fact_sheet)
 
 
-async def get_fact_sheet_by_project_id_service(db: AsyncSession, project_id: int) -> Optional[FactSheetRead]:
+async def get_fact_sheet_by_project_id_service(
+    db: AsyncSession, 
+    project_id: int, 
+    current_user_role: str = None,
+    current_user_username: str = None
+) -> Optional[FactSheetRead]:
     """
-    Get fact sheet by project ID
+    Get fact sheet by project ID with role-based access control
     
     Args:
         db: Database session
         project_id: Project ID
+        current_user_role: Current user's role (admin or project)
+        current_user_username: Current user's username (for PROJECT role validation)
         
     Returns:
         Fact sheet data or None if not found
+        
+    Raises:
+        ValueError: If PROJECT role user doesn't have access to this project
     """
+    # Role-based access control for PROJECT role users
+    if current_user_role == "project" and current_user_username:
+        has_access = await fact_sheets_repository.check_user_project_access(db, current_user_username, project_id)
+        if not has_access:
+            raise ValueError("Access denied: You can only access fact sheets for your own project")
+    
     fact_sheet = await fact_sheets_repository.get_fact_sheet_by_project_id(db, project_id)
     
     if fact_sheet:
@@ -65,23 +81,31 @@ async def update_fact_sheet_service(
     db: AsyncSession, 
     project_id: int, 
     fact_sheet_data: FactSheetUpdate,
-    current_user_role: str
+    current_user_role: str,
+    current_user_username: str = None
 ) -> Optional[FactSheetRead]:
     """
-    Update fact sheet information with role-based validation
+    Update fact sheet information with role-based validation and access control
     
     Args:
         db: Database session
         project_id: Project ID
         fact_sheet_data: Fact sheet update data
         current_user_role: Current user's role (admin or project)
+        current_user_username: Current user's username (for PROJECT role validation)
         
     Returns:
         Updated fact sheet data or None if not found
         
     Raises:
-        ValueError: If project role tries to update approved fact sheet or admin tries to update content
+        ValueError: If project role tries to update approved fact sheet, admin tries to update content, or access denied
     """
+    # Role-based access control for PROJECT role users
+    if current_user_role == "project" and current_user_username:
+        has_access = await fact_sheets_repository.check_user_project_access(db, current_user_username, project_id)
+        if not has_access:
+            raise ValueError("Access denied: You can only update fact sheets for your own project")
+    
     # Get existing fact sheet
     existing_fact_sheet = await fact_sheets_repository.get_fact_sheet_by_project_id(db, project_id)
     if not existing_fact_sheet:

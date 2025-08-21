@@ -243,4 +243,47 @@ async def delete_project(
         response_data = ResponseFormatter.error_response(
             message="Internal server error"
         )
-        return JSONResponse(content=response_data.to_dict(), status_code=500) 
+        return JSONResponse(content=response_data.to_dict(), status_code=500)
+
+
+@router.get("/my-project")
+async def get_my_project(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserRead = Depends(require_roles([UserRole.PROJECT]))
+):
+    """
+    Get my project (PROJECT role only)
+    
+    Returns the project that matches the logged-in user's username with the project's username.
+    
+    Args:
+        db: Database session
+        current_user: Current authenticated user with PROJECT role
+        
+    Returns:
+        Project data that matches the user's username
+    """
+    try:
+        logger.info(f"User {current_user.username} with PROJECT role requesting their project")
+        
+        # Service handles business logic and database operations
+        project = await project_service.get_my_project_service(db, current_user.username)
+        
+        if not project:
+            response_data = ResponseFormatter.error_response(
+                message="Project not found for this user"
+            )
+            return JSONResponse(content=response_data.to_dict(), status_code=404)
+        
+        response_data = ResponseFormatter.success_response(
+            data=project,
+            message="Project retrieved successfully"
+        )
+        return JSONResponse(content=response_data.to_dict(), status_code=200)
+        
+    except Exception as e:
+        logger.error(f"Error retrieving project for user {current_user.username}: {e}")
+        response_data = ResponseFormatter.error_response(
+            message="Internal server error"
+        )
+        return JSONResponse(content=response_data.to_dict(), status_code=500)

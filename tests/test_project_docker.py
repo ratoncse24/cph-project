@@ -446,4 +446,122 @@ class TestProjectSchemaValidation:
         }
         
         with pytest.raises(ValueError):
-            ProjectUpdate(**invalid_data) 
+            ProjectUpdate(**invalid_data)
+
+
+class TestMyProjectEndpoint:
+    """Test the my-project endpoint for PROJECT role users"""
+    
+    def test_my_project_unauthorized_access(self):
+        """Test that unauthorized access returns 401"""
+        response = client.get("/projects/api/v1/my-project")
+        assert response.status_code == 401
+        assert "Authorization header required" in response.json()["detail"]
+    
+    def test_my_project_with_admin_role(self):
+        """Test that admin role cannot access my-project endpoint"""
+        # Override the authentication dependency
+        app.dependency_overrides = {}
+        
+        # Create a mock admin user
+        mock_user = UserRead(
+            id=1,
+            username="admin",
+            email="admin@example.com",
+            role_name=UserRole.ADMIN,
+            status="active"
+        )
+        
+        # Override the get_current_user dependency
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        try:
+            response = client.get("/projects/api/v1/my-project")
+            
+            # Should get 403 for forbidden access
+            assert response.status_code == 403
+            assert "Operation not permitted" in response.json()["detail"]
+            
+        finally:
+            # Clean up dependency overrides
+            app.dependency_overrides = {}
+    
+    def test_my_project_with_project_role_success(self):
+        """Test my-project endpoint with PROJECT role user"""
+        # Override the authentication dependency
+        app.dependency_overrides = {}
+        
+        # Create a mock project user
+        mock_user = UserRead(
+            id=2,
+            username="testproject",
+            email="project@example.com",
+            role_name=UserRole.PROJECT,
+            status="active"
+        )
+        
+        # Override the get_current_user dependency
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        try:
+            response = client.get("/projects/api/v1/my-project")
+            
+            # Should get 200 for success or 404 if project not found
+            assert response.status_code in [200, 404]
+            
+            if response.status_code == 200:
+                data = response.json()
+                assert data["success"] is True
+                assert "Project retrieved successfully" in data["message"]
+                assert "id" in data["response"]["data"]
+                assert "name" in data["response"]["data"]
+                assert "username" in data["response"]["data"]
+                # Verify the project username matches the user's username
+                assert data["response"]["data"]["username"] == mock_user.username
+            else:
+                data = response.json()
+                assert data["success"] is False
+                assert "Project not found for this user" in data["message"]
+                
+        finally:
+            # Clean up dependency overrides
+            app.dependency_overrides = {}
+    
+    def test_my_project_with_project_role_not_found(self):
+        """Test my-project endpoint when project doesn't exist for user"""
+        # Override the authentication dependency
+        app.dependency_overrides = {}
+        
+        # Create a mock project user with non-existent project username
+        mock_user = UserRead(
+            id=3,
+            username="nonexistentproject",
+            email="nonexistent@example.com",
+            role_name=UserRole.PROJECT,
+            status="active"
+        )
+        
+        # Override the get_current_user dependency
+        async def override_get_current_user():
+            return mock_user
+        
+        app.dependency_overrides[get_current_user] = override_get_current_user
+        
+        try:
+            response = client.get("/projects/api/v1/my-project")
+            
+            # Should get 404 for project not found
+            assert response.status_code == 404
+            data = response.json()
+            assert data["success"] is False
+            assert "Project not found for this user" in data["message"]
+                
+        finally:
+            # Clean up dependency overrides
+            app.dependency_overrides = {}

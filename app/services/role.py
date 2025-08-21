@@ -79,20 +79,39 @@ async def get_role(db: AsyncSession, role_id: int) -> Optional[RoleReadWithRelat
 async def get_roles_list(
     db: AsyncSession, 
     pagination: PaginationParams,
-    query_params: Optional[Dict[str, Any]] = None
+    query_params: Optional[Dict[str, Any]] = None,
+    current_user_role: str = None,
+    current_user_username: str = None
 ) -> RoleListResponse:
     """
-    Get paginated list of roles with filtering and search
+    Get paginated list of roles with filtering and search and role-based access control
     
     Args:
         db: Database session
         pagination: Pagination parameters
         query_params: Query parameters for filtering and search
+        current_user_role: Current user's role (admin or project)
+        current_user_username: Current user's username (for PROJECT role validation)
         
     Returns:
         Paginated response with roles
     """
     try:
+        # Role-based access control for PROJECT role users
+        if current_user_role == "project" and current_user_username:
+            # Get the user's project ID
+            user_project_id = await role_repo.get_user_project_id(db, current_user_username)
+            if not user_project_id:
+                logger.warning(f"Project not found for user: {current_user_username}")
+                return PaginationHandler.create_response([], pagination, 0)
+            
+            # Force the query to only return roles for the user's project
+            if query_params is None:
+                query_params = {}
+            query_params['project_id'] = user_project_id
+            
+            logger.info(f"PROJECT role user {current_user_username} accessing roles for their project ID: {user_project_id}")
+        
         # Business logic validation for query parameters
         if query_params:
             # Validate project_id if provided

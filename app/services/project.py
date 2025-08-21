@@ -52,6 +52,7 @@ async def create_project_service(db: AsyncSession, project_data: ProjectCreate) 
         project_id=new_project.id,
         project_name=new_project.name,
         username=new_project.username,
+        status=new_project.status,
         password=project_data.password,  # Include password in event
         client_id=new_project.client_id
     )
@@ -143,6 +144,7 @@ async def update_project_service(db: AsyncSession, project_id: int, project_data
             project_id=updated_project.id,
             project_name=updated_project.name,
             username=updated_project.username,
+            status=updated_project.status,
             password=project_data.password if project_data.password else None,  # Include password if provided
             client_id=updated_project.client_id
         )
@@ -165,6 +167,25 @@ async def get_project_by_id_service(db: AsyncSession, project_id: int) -> Option
         Project data or None if not found
     """
     project = await project_repository.get_project_by_id(db, project_id)
+    
+    if project:
+        return _convert_to_project_read(project)
+    
+    return None
+
+
+async def get_my_project_service(db: AsyncSession, username: str) -> Optional[ProjectRead]:
+    """
+    Get project by username (for PROJECT role users)
+    
+    Args:
+        db: Database session
+        username: Username to match with project username
+        
+    Returns:
+        Project data or None if not found
+    """
+    project = await project_repository.get_project_by_username(db, username)
     
     if project:
         return _convert_to_project_read(project)
@@ -228,16 +249,21 @@ async def _publish_project_event(
     project_id: int,
     project_name: str,
     username: str,
+    status: str,
     password: Optional[str] = None,
     client_id: int = None
 ):
     """Publish project event to SNS"""
     try:
+        if status != 'active':
+            status = 'inactive'
+        
         event_data = {
             "project_id": project_id,
             "name": project_name,
             "username": username,
-            "client_id": client_id
+            "client_id": client_id,
+            "status": status
         }
         
         # Include password in event data if provided

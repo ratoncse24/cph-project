@@ -54,7 +54,8 @@ async def create_project_service(db: AsyncSession, project_data: ProjectCreate) 
         username=new_project.username,
         status=new_project.status,
         password=project_data.password,  # Include password in event
-        client_id=new_project.client_id
+        client_id=new_project.client_id,
+        db=db
     )
     
     logger.info(f"Project created successfully: {new_project.name} (ID: {new_project.id})")
@@ -146,7 +147,8 @@ async def update_project_service(db: AsyncSession, project_id: int, project_data
             username=updated_project.username,
             status=updated_project.status,
             password=project_data.password if project_data.password else None,  # Include password if provided
-            client_id=updated_project.client_id
+            client_id=updated_project.client_id,
+            db=db
         )
         
         logger.info(f"Project updated successfully: {updated_project.name} (ID: {project_id})")
@@ -252,7 +254,8 @@ async def _publish_project_event(
     username: str,
     status: str,
     password: Optional[str] = None,
-    client_id: int = None
+    client_id: int = None,
+    db: AsyncSession = None
 ):
     """Publish project event to SNS"""
     try:
@@ -270,6 +273,22 @@ async def _publish_project_event(
         # Include password in event data if provided
         if password:
             event_data["password"] = password
+        
+        # Fetch and include client details if client_id is provided and db session is available
+        if client_id and db:
+            try:
+                from app.repository import client as client_repository
+                client = await client_repository.get_client_by_id(db, client_id)
+                if client:
+                    event_data["client_details"] = {
+                        "name": client.name,
+                        "phone": client.phone,
+                        "email": client.email
+                    }
+                else:
+                    logger.warning(f"Client with ID {client_id} not found for event publishing")
+            except Exception as e:
+                logger.error(f"Error fetching client details for event publishing: {e}")
         
         publish_request = PublishEventRequest(
             event_type=event_type,

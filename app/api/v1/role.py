@@ -65,7 +65,7 @@ async def get_roles_list(
     size: int = Query(default=20, ge=1, le=100, description="Results per page"),
     search: str = Query(default=None, description="Search term for name, gender, ethnicity, language, category, hair_color, or project name"),
     project_id: int = Query(default=None, description="Filter by project ID"),
-    status: str = Query(default=None, description="Filter by status"),
+    role_status: str = Query(default=None, description="Filter by status"),
     gender: str = Query(default=None, description="Filter by gender"),
     category: str = Query(default=None, description="Filter by category"),
     age_from: int = Query(default=None, ge=0, le=150, description="Filter by minimum age"),
@@ -110,8 +110,8 @@ async def get_roles_list(
         query_params['search'] = search
     if project_id:
         query_params['project_id'] = project_id
-    if status:
-        query_params['status'] = status
+    if role_status:
+        query_params['status'] = role_status
     if gender:
         query_params['gender'] = gender
     if category:
@@ -266,6 +266,7 @@ async def delete_role(
             return JSONResponse(content=response_data.to_dict(), status_code=status.HTTP_404_NOT_FOUND)
         
         response_data = ResponseFormatter.success_response(
+            data={},
             message="Role deleted successfully"
         )
         return JSONResponse(content=response_data.to_dict(), status_code=status.HTTP_200_OK)

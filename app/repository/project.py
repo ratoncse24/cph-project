@@ -106,10 +106,12 @@ async def get_project_by_id(db: AsyncSession, project_id: int) -> Optional[Proje
 
 
 async def get_project_by_username(db: AsyncSession, username: str) -> Optional[Project]:
-    """Get project by username"""
+    """Get project by username with client information"""
     try:
         result = await db.execute(
-            select(Project).where(Project.username == username)
+            select(Project)
+            .options(selectinload(Project.client))
+            .where(Project.username == username)
         )
         return result.scalar_one_or_none()
     except Exception as e:
@@ -120,9 +122,11 @@ async def get_project_by_username(db: AsyncSession, username: str) -> Optional[P
 async def update_project(db: AsyncSession, project_id: int, project_data: dict) -> Optional[Project]:
     """Update project information"""
     try:
-        # Get existing project
+        # Get existing project with client relationship loaded
         result = await db.execute(
-            select(Project).where(Project.id == project_id)
+            select(Project)
+            .options(selectinload(Project.client))
+            .where(Project.id == project_id)
         )
         project = result.scalar_one_or_none()
         
@@ -141,16 +145,8 @@ async def update_project(db: AsyncSession, project_id: int, project_data: dict) 
         await db.commit()
         await db.refresh(project)
         
-        # Load the client relationship
-        result = await db.execute(
-            select(Project)
-            .options(selectinload(Project.client))
-            .where(Project.id == project_id)
-        )
-        project_with_client = result.scalar_one()
-        
-        logger.info(f"Project updated successfully: {project_with_client.name} (ID: {project_id})")
-        return project_with_client
+        logger.info(f"Project updated successfully: {project.name} (ID: {project_id})")
+        return project
         
     except Exception as e:
         logger.error(f"Error updating project {project_id}: {e}")
@@ -162,7 +158,9 @@ async def soft_delete_project(db: AsyncSession, project_id: int) -> bool:
     """Soft delete project by setting deleted_at timestamp"""
     try:
         result = await db.execute(
-            select(Project).where(Project.id == project_id)
+            select(Project)
+            .options(selectinload(Project.client))
+            .where(Project.id == project_id)
         )
         project = result.scalar_one_or_none()
         

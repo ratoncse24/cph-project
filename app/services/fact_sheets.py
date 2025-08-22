@@ -82,7 +82,8 @@ async def update_fact_sheet_service(
     project_id: int, 
     fact_sheet_data: FactSheetUpdate,
     current_user_role: str,
-    current_user_username: str = None
+    current_user_username: str = None,
+    current_user_id: int = None
 ) -> Optional[FactSheetRead]:
     """
     Update fact sheet information with role-based validation and access control
@@ -121,19 +122,9 @@ async def update_fact_sheet_service(
         # Project role cannot update status
         if fact_sheet_data.status is not None:
             raise ValueError("Project role cannot update fact sheet status")
-    
-    elif current_user_role == "admin":
-        # Admin can only update status, not content
-        content_fields = [
-            'client_reference', 'cph_casting_reference', 'project_name', 'director',
-            'deadline_date', 'ppm_date', 'project_description', 'shooting_date',
-            'location', 'total_hours', 'time_range_start', 'time_range_end',
-            'budget_details', 'terms', 'total_project_price', 'rights_buy_outs', 'conditions'
-        ]
-        
-        for field in content_fields:
-            if getattr(fact_sheet_data, field) is not None:
-                raise ValueError(f"Admin role cannot update fact sheet content field: {field}")
+
+    if current_user_role == "admin" and existing_fact_sheet.status == "approved":
+        approve_fact_sheet_service(db, project_id, current_user_id)
     
     # Prepare update data (only non-None values)
     update_data = {}

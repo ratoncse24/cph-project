@@ -37,6 +37,7 @@ class UserUpdatedEventData(UserEventData):
 
 
 class UserCreate(BaseModel):
+    name: Optional[str] = Field(..., min_length=3, max_length=100, description="Unique username")
     username: str = Field(..., min_length=3, max_length=100, description="Unique username")
     email: Optional[EmailStr] = Field(None, description="User's email address (optional)")
     phone: Optional[str] = Field(None, max_length=20, description="User's phone number")
@@ -70,6 +71,7 @@ class UserCreate(BaseModel):
 
 class UserRead(BaseModel):
     id: int
+    name: Optional[str] = None
     username: str
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
@@ -120,6 +122,7 @@ class TokenValidationResponse(BaseModel):
 
 class UserUpdate(BaseModel):
     """Schema for updating user information"""
+    name: Optional[str] = Field(..., min_length=3, max_length=100, description="Unique username")
     username: Optional[str] = Field(None, min_length=3, max_length=100)
     email: Optional[EmailStr] = Field(None, description="User's email address (optional)")
     phone: Optional[str] = Field(None, max_length=20)

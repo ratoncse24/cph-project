@@ -58,13 +58,10 @@ async def get_roles_paginated(
     Returns:
         RoleListResponse with paginated roles and metadata
     """
-    # Build the base query with joins for related data
-    query = select(
-        Role,
-        Project.name.label('project_name')
-    ).join(
-        Project, Role.project_id == Project.id
-    )
+    from sqlalchemy.orm import selectinload
+    
+    # Build the base query with project relationship loaded
+    query = select(Role).options(selectinload(Role.project))
     
     # Apply business logic filters from query_params
     if query_params:
@@ -77,8 +74,7 @@ async def get_roles_paginated(
                 Role.ethnicity.ilike(search_term),
                 Role.language.ilike(search_term),
                 Role.category.ilike(search_term),
-                Role.hair_color.ilike(search_term),
-                Project.name.ilike(search_term)
+                Role.hair_color.ilike(search_term)
             ]
             query = query.where(or_(*search_conditions))
         
@@ -111,12 +107,23 @@ async def get_roles_paginated(
             query = query.where(Role.height_to <= query_params['height_to'])
     
     # Delegate pagination to the utility
-    return await PaginationHandler.paginate_query(
+    result = await PaginationHandler.paginate_query(
         db=db,
         query=query,
         pagination=pagination,
         response_schema=RoleReadWithRelations
     )
+    
+    # Add project_name to each role result
+    for role_result in result.results:
+        if hasattr(role_result, 'project') and role_result.project:
+            try:
+                role_result.project_name = getattr(role_result.project, 'name', None)
+            except Exception as e:
+                logger.warning(f"Error accessing project name: {e}")
+                role_result.project_name = None
+    
+    return result
 
 
 async def update_role(db: AsyncSession, role_id: int, role_data: RoleUpdate) -> Optional[Role]:

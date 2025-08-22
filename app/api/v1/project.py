@@ -203,47 +203,47 @@ async def update_project(
         return JSONResponse(content=response_data.to_dict(), status_code=500)
 
 
-@router.delete("/projects/{project_id}")
-async def delete_project(
-    project_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: UserRead = Depends(require_roles([UserRole.ADMIN]))
-):
-    """
-    Soft delete project (Admin only)
+# @router.delete("/projects/{project_id}")
+# async def delete_project(
+#     project_id: int,
+#     db: AsyncSession = Depends(get_db),
+#     current_user: UserRead = Depends(require_roles([UserRole.ADMIN]))
+# ):
+#     """
+#     Soft delete project (Admin only)
     
-    Args:
-        project_id: Project ID to delete
-        db: Database session
-        current_user: Current authenticated admin user
+#     Args:
+#         project_id: Project ID to delete
+#         db: Database session
+#         current_user: Current authenticated admin user
         
-    Returns:
-        Success message
-    """
-    try:
-        logger.info(f"Admin {current_user.username} deleting project ID: {project_id}")
+#     Returns:
+#         Success message
+#     """
+#     try:
+#         logger.info(f"Admin {current_user.username} deleting project ID: {project_id}")
         
-        # Service handles business logic and database operations
-        success = await project_service.delete_project_service(db, project_id)
+#         # Service handles business logic and database operations
+#         success = await project_service.delete_project_service(db, project_id)
         
-        if not success:
-            response_data = ResponseFormatter.error_response(
-                message="Project not found"
-            )
-            return JSONResponse(content=response_data.to_dict(), status_code=404)
+#         if not success:
+#             response_data = ResponseFormatter.error_response(
+#                 message="Project not found"
+#             )
+#             return JSONResponse(content=response_data.to_dict(), status_code=404)
         
-        response_data = ResponseFormatter.success_response(
-            data={"project_id": project_id},
-            message="Project deleted successfully"
-        )
-        return JSONResponse(content=response_data.to_dict(), status_code=200)
+#         response_data = ResponseFormatter.success_response(
+#             data={"project_id": project_id},
+#             message="Project deleted successfully"
+#         )
+#         return JSONResponse(content=response_data.to_dict(), status_code=200)
         
-    except Exception as e:
-        logger.error(f"Error deleting project {project_id}: {e}")
-        response_data = ResponseFormatter.error_response(
-            message="Internal server error"
-        )
-        return JSONResponse(content=response_data.to_dict(), status_code=500)
+#     except Exception as e:
+#         logger.error(f"Error deleting project {project_id}: {e}")
+#         response_data = ResponseFormatter.error_response(
+#             message="Internal server error"
+#         )
+#         return JSONResponse(content=response_data.to_dict(), status_code=500)
 
 
 @router.get("/my-project")

@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import or_, and_
+from sqlalchemy.orm import selectinload
 from typing import Optional
 import datetime
 import logging
@@ -50,26 +51,44 @@ async def get_role_note_by_id(db: AsyncSession, note_id: int) -> Optional[RoleNo
         return None
 
 
-async def get_role_note_with_relations(db: AsyncSession, note_id: int) -> Optional[RoleNotesReadWithRelations]:
+async def get_role_note_with_relations(db: AsyncSession, note_id: int) -> Optional[RoleNotes]:
     """Get role note by ID with related data"""
     try:
         result = await db.execute(
-            select(
-                RoleNotes,
-                Project.name.label('project_name'),
-                Role.name.label('role_name'),
-                User.username.label('added_by_username'),
-                User.name.label('added_by_name'),
-                User.profile_picture_url.label('added_by_profile_picture_url')
-            ).join(
-                Project, RoleNotes.project_id == Project.id
-            ).join(
-                Role, RoleNotes.role_id == Role.id
-            ).join(
-                User, RoleNotes.added_by_user_id == User.id
+            select(RoleNotes).options(
+                selectinload(RoleNotes.project),
+                selectinload(RoleNotes.role),
+                selectinload(RoleNotes.added_by_user)
             ).where(RoleNotes.id == note_id)
         )
-        return result.first()
+        note = result.scalar_one_or_none()
+        
+        if note:
+            # Add related data to the note object
+            if hasattr(note, 'project') and note.project:
+                try:
+                    note.project_name = getattr(note.project, 'name', None)
+                except Exception as e:
+                    logger.warning(f"Error accessing project name: {e}")
+                    note.project_name = None
+            if hasattr(note, 'role') and note.role:
+                try:
+                    note.role_name = getattr(note.role, 'name', None)
+                except Exception as e:
+                    logger.warning(f"Error accessing role name: {e}")
+                    note.role_name = None
+            if hasattr(note, 'added_by_user') and note.added_by_user:
+                try:
+                    note.added_by_username = getattr(note.added_by_user, 'username', None)
+                    note.added_by_name = getattr(note.added_by_user, 'name', None)
+                    note.added_by_profile_picture_url = getattr(note.added_by_user, 'profile_picture_url', None)
+                except Exception as e:
+                    logger.warning(f"Error accessing user attributes: {e}")
+                    note.added_by_username = None
+                    note.added_by_name = None
+                    note.added_by_profile_picture_url = None
+        
+        return note
     except Exception as e:
         logger.error(f"Error fetching role note with relations by ID {note_id}: {e}")
         return None
@@ -91,20 +110,11 @@ async def get_role_notes_paginated(
     Returns:
         RoleNotesListResponse with paginated notes and metadata
     """
-    # Build the base query with joins for related data
-    query = select(
-        RoleNotes,
-        Project.name.label('project_name'),
-        Role.name.label('role_name'),
-        User.username.label('added_by_username'),
-        User.name.label('added_by_name'),
-        User.profile_picture_url.label('added_by_profile_picture_url')
-    ).join(
-        Project, RoleNotes.project_id == Project.id
-    ).join(
-        Role, RoleNotes.role_id == Role.id
-    ).join(
-        User, RoleNotes.added_by_user_id == User.id
+    # Build the base query with eager loading for related data
+    query = select(RoleNotes).options(
+        selectinload(RoleNotes.project),
+        selectinload(RoleNotes.role),
+        selectinload(RoleNotes.added_by_user)
     )
     
     # Apply business logic filters from query_params
@@ -112,11 +122,10 @@ async def get_role_notes_paginated(
         # Handle search parameter
         if query_params.get('search'):
             search_term = f"%{query_params['search']}%"
+            # Search only in RoleNotes fields since we can't join with eager loading
             search_conditions = [
                 RoleNotes.title.ilike(search_term),
-                RoleNotes.description.ilike(search_term),
-                Project.name.ilike(search_term),
-                Role.name.ilike(search_term)
+                RoleNotes.description.ilike(search_term)
             ]
             query = query.where(or_(*search_conditions))
         
@@ -133,12 +142,39 @@ async def get_role_notes_paginated(
             query = query.where(RoleNotes.added_by_user_id == query_params['added_by_user_id'])
     
     # Delegate pagination to the utility
-    return await PaginationHandler.paginate_query(
+    result = await PaginationHandler.paginate_query(
         db=db,
         query=query,
         pagination=pagination,
         response_schema=RoleNotesReadWithRelations
     )
+    
+    # Add related data to each note result
+    for note_result in result.results:
+        if hasattr(note_result, 'project') and note_result.project:
+            try:
+                note_result.project_name = getattr(note_result.project, 'name', None)
+            except Exception as e:
+                logger.warning(f"Error accessing project name: {e}")
+                note_result.project_name = None
+        if hasattr(note_result, 'role') and note_result.role:
+            try:
+                note_result.role_name = getattr(note_result.role, 'name', None)
+            except Exception as e:
+                logger.warning(f"Error accessing role name: {e}")
+                note_result.role_name = None
+        if hasattr(note_result, 'added_by_user') and note_result.added_by_user:
+            try:
+                note_result.added_by_username = getattr(note_result.added_by_user, 'username', None)
+                note_result.added_by_name = getattr(note_result.added_by_user, 'name', None)
+                note_result.added_by_profile_picture_url = getattr(note_result.added_by_user, 'profile_picture_url', None)
+            except Exception as e:
+                logger.warning(f"Error accessing user attributes: {e}")
+                note_result.added_by_username = None
+                note_result.added_by_name = None
+                note_result.added_by_profile_picture_url = None
+    
+    return result
 
 
 async def update_role_note(db: AsyncSession, note_id: int, note_data: RoleNotesUpdate) -> Optional[RoleNotes]:

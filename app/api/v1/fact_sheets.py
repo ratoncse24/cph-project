@@ -99,7 +99,7 @@ async def update_fact_sheet(
         
         # Service handles business logic and database operations with role-based validation and access control
         updated_fact_sheet = await fact_sheets_service.update_fact_sheet_service(
-            db, project_id, fact_sheet_data, current_user.role_name, current_user.username
+            db, project_id, fact_sheet_data, current_user.role_name, current_user.username, current_user.id
         )
         
         if not updated_fact_sheet:
@@ -127,55 +127,3 @@ async def update_fact_sheet(
             message="Internal server error"
         )
         return JSONResponse(content=response_data.to_dict(), status_code=500)
-
-
-@router.put("/fact-sheets/{project_id}/approve")
-async def approve_fact_sheet(
-    project_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: UserRead = Depends(require_roles([UserRole.ADMIN]))
-):
-    """
-    Approve fact sheet (Admin only)
-    
-    Args:
-        project_id: Project ID
-        db: Database session
-        current_user: Current authenticated admin user
-        
-    Returns:
-        Approved fact sheet data
-    """
-    try:
-        logger.info(f"Admin {current_user.username} approving fact sheet for project ID: {project_id}")
-        
-        # Service handles business logic and database operations
-        approved_fact_sheet = await fact_sheets_service.approve_fact_sheet_service(
-            db, project_id, current_user.id
-        )
-        
-        if not approved_fact_sheet:
-            response_data = ResponseFormatter.error_response(
-                message="Fact sheet not found"
-            )
-            return JSONResponse(content=response_data.to_dict(), status_code=404)
-        
-        response_data = ResponseFormatter.success_response(
-            data=approved_fact_sheet,
-            message="Fact sheet approved successfully"
-        )
-        return JSONResponse(content=response_data.to_dict(), status_code=200)
-        
-    except ValueError as e:
-        logger.warning(f"Validation error approving fact sheet for project {project_id}: {e}")
-        response_data = ResponseFormatter.error_response(
-            message=str(e)
-        )
-        return JSONResponse(content=response_data.to_dict(), status_code=400)
-        
-    except Exception as e:
-        logger.error(f"Error approving fact sheet for project {project_id}: {e}")
-        response_data = ResponseFormatter.error_response(
-            message="Internal server error"
-        )
-        return JSONResponse(content=response_data.to_dict(), status_code=500) 

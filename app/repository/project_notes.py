@@ -48,23 +48,41 @@ async def get_project_note_by_id(db: AsyncSession, note_id: int) -> Optional[Pro
         return None
 
 
-async def get_project_note_with_relations(db: AsyncSession, note_id: int) -> Optional[ProjectNotesReadWithRelations]:
+async def get_project_note_with_relations(db: AsyncSession, note_id: int) -> Optional[ProjectNotes]:
     """Get project note by ID with related data"""
     try:
+        from sqlalchemy.orm import selectinload
+        
         result = await db.execute(
-            select(
-                ProjectNotes,
-                Project.name.label('project_name'),
-                User.username.label('added_by_username'),
-                User.name.label('added_by_name'),
-                User.profile_picture_url.label('added_by_profile_picture_url')
-            ).join(
-                Project, ProjectNotes.project_id == Project.id
-            ).join(
-                User, ProjectNotes.added_by_user_id == User.id
-            ).where(ProjectNotes.id == note_id)
+            select(ProjectNotes)
+            .options(
+                selectinload(ProjectNotes.project),
+                selectinload(ProjectNotes.added_by_user)
+            )
+            .where(ProjectNotes.id == note_id)
         )
-        return result.first()
+        note = result.scalar_one_or_none()
+        
+        if note:
+            # Add related data to the note object
+            if hasattr(note, 'project') and note.project:
+                try:
+                    note.project_name = getattr(note.project, 'name', None)
+                except Exception as e:
+                    logger.warning(f"Error accessing project name: {e}")
+                    note.project_name = None
+            if hasattr(note, 'added_by_user') and note.added_by_user:
+                try:
+                    note.added_by_username = getattr(note.added_by_user, 'username', None)
+                    note.added_by_name = getattr(note.added_by_user, 'name', None)
+                    note.added_by_profile_picture_url = getattr(note.added_by_user, 'profile_picture_url', None)
+                except Exception as e:
+                    logger.warning(f"Error accessing user attributes: {e}")
+                    note.added_by_username = None
+                    note.added_by_name = None
+                    note.added_by_profile_picture_url = None
+        
+        return note
     except Exception as e:
         logger.error(f"Error fetching project note with relations by ID {note_id}: {e}")
         return None
@@ -86,17 +104,12 @@ async def get_project_notes_paginated(
     Returns:
         ProjectNotesListResponse with paginated notes and metadata
     """
-    # Build the base query with joins for related data
-    query = select(
-        ProjectNotes,
-        Project.name.label('project_name'),
-        User.username.label('added_by_username'),
-        User.name.label('added_by_name'),
-        User.profile_picture_url.label('added_by_profile_picture_url')
-    ).join(
-        Project, ProjectNotes.project_id == Project.id
-    ).join(
-        User, ProjectNotes.added_by_user_id == User.id
+    from sqlalchemy.orm import selectinload
+    
+    # Build the base query with relationships loaded
+    query = select(ProjectNotes).options(
+        selectinload(ProjectNotes.project),
+        selectinload(ProjectNotes.added_by_user)
     )
     
     # Apply business logic filters from query_params
@@ -106,8 +119,7 @@ async def get_project_notes_paginated(
             search_term = f"%{query_params['search']}%"
             search_conditions = [
                 ProjectNotes.title.ilike(search_term),
-                ProjectNotes.description.ilike(search_term),
-                Project.name.ilike(search_term)
+                ProjectNotes.description.ilike(search_term)
             ]
             query = query.where(or_(*search_conditions))
         
@@ -120,12 +132,33 @@ async def get_project_notes_paginated(
             query = query.where(ProjectNotes.added_by_user_id == query_params['added_by_user_id'])
     
     # Delegate pagination to the utility
-    return await PaginationHandler.paginate_query(
+    result = await PaginationHandler.paginate_query(
         db=db,
         query=query,
         pagination=pagination,
         response_schema=ProjectNotesReadWithRelations
     )
+    
+    # Add related data to each note result
+    for note_result in result.results:
+        if hasattr(note_result, 'project') and note_result.project:
+            try:
+                note_result.project_name = getattr(note_result.project, 'name', None)
+            except Exception as e:
+                logger.warning(f"Error accessing project name: {e}")
+                note_result.project_name = None
+        if hasattr(note_result, 'added_by_user') and note_result.added_by_user:
+            try:
+                note_result.added_by_username = getattr(note_result.added_by_user, 'username', None)
+                note_result.added_by_name = getattr(note_result.added_by_user, 'name', None)
+                note_result.added_by_profile_picture_url = getattr(note_result.added_by_user, 'profile_picture_url', None)
+            except Exception as e:
+                logger.warning(f"Error accessing user attributes: {e}")
+                note_result.added_by_username = None
+                note_result.added_by_name = None
+                note_result.added_by_profile_picture_url = None
+    
+    return result
 
 
 async def update_project_note(db: AsyncSession, note_id: int, note_data: ProjectNotesUpdate) -> Optional[ProjectNotes]:

@@ -233,6 +233,7 @@ async def delete_project_note(
             return JSONResponse(content=response_data.to_dict(), status_code=status.HTTP_404_NOT_FOUND)
         
         response_data = ResponseFormatter.success_response(
+            data = {},
             message="Project note deleted successfully"
         )
         return JSONResponse(content=response_data.to_dict(), status_code=status.HTTP_200_OK)

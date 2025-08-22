@@ -43,7 +43,7 @@ async def create_role_note(db: AsyncSession, note_data: RoleNotesCreate, user_id
         if note_with_relations:
             return RoleNotesReadWithRelations.model_validate(note_with_relations)
         else:
-            return note
+            return RoleNotesReadWithRelations.model_validate(note)
         
     except Exception as e:
         logger.error(f"Error in create_role_note service: {e}")

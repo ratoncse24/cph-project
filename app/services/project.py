@@ -221,10 +221,11 @@ def _convert_to_project_read(project) -> ProjectRead:
     # Check if client relationship is loaded and accessible
     if hasattr(project, 'client') and project.client is not None:
         try:
-            client_name = project.client.name
-            client_email = project.client.email
-        except Exception:
-            # If accessing client attributes fails, set to None
+            # Use getattr to safely access attributes
+            client_name = getattr(project.client, 'name', None)
+            client_email = getattr(project.client, 'email', None)
+        except Exception as e:
+            logger.warning(f"Error accessing client attributes: {e}")
             client_name = None
             client_email = None
     

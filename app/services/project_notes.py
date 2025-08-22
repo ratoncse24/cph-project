@@ -38,7 +38,7 @@ async def create_project_note(db: AsyncSession, note_data: ProjectNotesCreate, u
         if note_with_relations:
             return ProjectNotesReadWithRelations.model_validate(note_with_relations)
         else:
-            return note
+            return ProjectNotesReadWithRelations.model_validate(note)
         
     except Exception as e:
         logger.error(f"Error in create_project_note service: {e}")
